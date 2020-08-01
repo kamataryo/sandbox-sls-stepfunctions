@@ -1,0 +1,114 @@
+service: sandbox-sls-stepfunctions
+
+frameworkVersion: ">=1.74.0 <2.0.0"
+
+plugins:
+  - serverless-step-functions
+
+package:
+  exclude:
+    - .git/**
+    - src/**
+    - .*
+    - tsconfig.*
+    - package-lock.json
+    - yarn.lock
+    - README.md
+    - serverless-*.yml
+    - serverless.yml
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  memorySize: 128
+  region: us-east-1
+  stage: dev
+  environment:
+    TEAM_TABLE_NAME: ${self:custom.teamTableName}
+    AGGREGATION_TABLE_NAME: ${self:custom.aggregationTableName}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:GetItem
+        - dynamodb:Query
+        - dynamodb:Scan
+      Resource:
+        - Fn::Join:
+            - ":"
+            - - arn:aws:dynamodb
+              - ${self:provider.region}
+              - Ref: "AWS::AccountId"
+              - table/${self:custom.teamTableName}
+        - Fn::Join:
+            - ":"
+            - - arn:aws:dynamodb
+              - ${self:provider.region}
+              - Ref: "AWS::AccountId"
+              - table/${self:custom.aggregationTableName}
+        - Fn::Join:
+            - ":"
+            - - arn:aws:dynamodb
+              - ${self:provider.region}
+              - Ref: "AWS::AccountId"
+              - table/${self:custom.aggregationTableName}/index/identity-timestamp-index
+
+custom:
+  teamTableName: team-${opt:stage, self:provider.stage}
+  aggregationTableName: aggregation-${opt:stage, self:provider.stage}
+
+functions:
+  listTeams:
+    handler: dist/list-teams.handler
+  splitTeams:
+    handler: dist/split-teams.handler
+  aggregate:
+    handler: dist/aggregate.handler
+
+stepFunctions:
+  stateMachines:
+    AggregateBatch:
+      definition:
+        StartAt: HelloBatch
+
+        States:
+          HelloBatch:
+            Type: Wait
+            Seconds: 2
+            Next: ListTeams
+
+          ListTeams:
+            Type: Task
+            Comment: "チームを列挙"
+            InputPath: $
+            Resource:
+              Fn::GetAtt: [listTeams, Arn]
+            OutputPath: $
+            Next: SplitTeams
+
+          SplitTeams:
+            Type: Task
+            Comment: "チームをバッチサイズに分割"
+            InputPath: $
+            Resource:
+              Fn::GetAtt: [splitTeams, Arn]
+            OutputPath: $
+            Next: ProcessAllTeamBatches
+
+          ProcessAllTeamBatches:
+            Type: Map
+            InputPath: $
+            ItemsPath: $.teamIdBatches
+            MaxConcurrency: 10
+            Iterator:
+              StartAt: Aggregate
+              States:
+                Aggregate:
+                  Type: Task
+                  Comment: "チームの利用量を集計する"
+                  InputPath: $
+                  Resource:
+                    Fn::GetAtt: [aggregate, Arn]
+                  End: true
+            ResultPath: $.processedTeams
+            End: true

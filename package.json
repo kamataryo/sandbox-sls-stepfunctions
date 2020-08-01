@@ -1,0 +1,24 @@
+{
+  "name": "sandbox-sls-stepfunctions",
+  "version": "1.0.0",
+  "main": "serverless.yml",
+  "license": "MIT",
+  "scripts": {
+    "deploy": "tsc && sls deploy",
+    "remove": "sls remove"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.58",
+    "aws-sdk": "^2.710.0",
+    "serverless": "^1.74.1",
+    "serverless-step-functions": "^2.21.1",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.6"
+  },
+  "peerDependencies": {
+    "aws-sdk": "^2"
+  },
+  "dependencies": {
+    "dayjs": "^1.8.29"
+  }
+}
