@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.58",
-    "aws-sdk": "^2.710.0",
+    "aws-sdk": "^2.814.0",
     "serverless": "^1.77.1",
     "serverless-step-functions": "^2.21.1",
     "ts-node": "^8.10.2",
